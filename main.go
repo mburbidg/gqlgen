@@ -10,17 +10,10 @@ import (
 
 func main() {
 	p := newBNFParser()
-	g := newGenerator()
+	tree := p.parse(getInput())
 
-	t, err := p.parse(getInput())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = g.generate(os.Stdout, t)
-	if err != nil {
-		log.Fatal(err)
-	}
+	g := newGenerator(tree)
+	g.generate(os.Stdout, "GQL-program", tree)
 }
 
 func getInput() io.Reader {

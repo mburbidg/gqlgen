@@ -1,0 +1,5 @@
+<BNFdef name="session reset arguments" predicative="no">
+   <rhs>
+      <seeTheRules/>
+   </rhs>
+</BNFdef>

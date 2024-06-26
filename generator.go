@@ -25,9 +25,10 @@ func newGenerator(grammar *node) *generator {
 	g.transformRepeat(g.grammar)
 	g.transformAlt(g.grammar)
 	g.condenseRhs(g.grammar)
+	g.assignId(g.grammar)
 	g.buildRuleMap()
 
-	//g.printNode(g.grammar, "")
+	g.printNode(g.grammar, "")
 
 	return g
 }
@@ -145,6 +146,14 @@ func (g *generator) removeChild(n, childToRemove *node) {
 	n.children = c
 }
 
+func (g *generator) assignId(root *node) {
+	var nextId int
+	g.walk(root, func(n *node) {
+		n.id = nextId
+		nextId++
+	})
+}
+
 func (g *generator) transformAlt(n *node) {
 	for _, child := range n.children {
 		g.transformAlt(child)
@@ -184,11 +193,11 @@ func (g *generator) transformSeeTheRules(n *node) {
 
 func (g *generator) printNode(n *node, indent string) {
 	if n.kind == kwKind {
-		fmt.Printf("%s%s(%s)\n", indent, n.kind, n.value)
+		fmt.Printf("%s%s(%d, %s)\n", indent, n.kind, n.id, n.value)
 	} else if n.kind == bnfKind || n.kind == bnfDefKind {
-		fmt.Printf("%s%s(%s)\n", indent, n.kind, n.name)
+		fmt.Printf("%s%s(%d, %s)\n", indent, n.kind, n.id, n.name)
 	} else {
-		fmt.Printf("%s%s\n", indent, n.kind)
+		fmt.Printf("%s%s(%d)\n", indent, n.kind, n.id)
 	}
 	for _, child := range n.children {
 		g.printNode(child, indent+"  ")

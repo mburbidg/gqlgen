@@ -18,6 +18,7 @@ const (
 )
 
 type node struct {
+	id         int
 	kind       string
 	name       string
 	parent     *node

@@ -51,68 +51,68 @@ func (g *generator) generate(w io.Writer, startRule string, tree *node) {
 func (g *generator) buildRuleMap() {
 	g.rules = make(map[string]*node)
 	g.walk(g.grammar, func(n *node) {
-		if n.id == bnfDefId {
+		if n.kind == bnfDefKind {
 			g.rules[n.name] = n.children[0] // rhs
 		}
 	})
 	g.rules["character representation"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateCharacterRepresentation,
 	}
 	g.rules["string literal character"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateStringLiteralCharacter,
 	}
 	g.rules["identifier start"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateIdentifierStart,
 	}
 	g.rules["identifier extend"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateIdentifierExtend,
 	}
 	g.rules["whitespace"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateWhitespace,
 	}
 	g.rules["truncating whitespace"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateTruncatingWhitespace,
 	}
 	g.rules["bidirectional control character"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateBidirectionControlCharacter,
 	}
 	g.rules["simple comment character"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateSimpleCommentCharacter,
 	}
 	g.rules["bracketed comment contents"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateBracketedCommentContents,
 	}
 	g.rules["newline"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateNewline,
 	}
 	g.rules["other digit"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateOtherDigit,
 	}
 	g.rules["other language character"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateOtherLanguageCharacter,
 	}
 	g.rules["single quoted character sequence"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateSingleQuotedCharacterSequence,
 	}
 	g.rules["double quoted character sequence"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateDoubleQuotedCharacterSequence,
 	}
 	g.rules["accent quoted character sequence"] = &node{
-		id:         fnId,
+		kind:       fnKind,
 		generateFn: g.generateAccentQuotedCharacterSequence,
 	}
 }
@@ -121,7 +121,7 @@ func (g *generator) transformRepeat(n *node) {
 	var prev *node
 	toRemove := []*node{}
 	for _, child := range n.children {
-		if child.id == repeatId {
+		if child.kind == repeatKind {
 			child.children = append(child.children, prev)
 			prev.parent = child
 			toRemove = append(toRemove, prev)
@@ -138,7 +138,7 @@ func (g *generator) transformRepeat(n *node) {
 func (g *generator) removeChild(n, childToRemove *node) {
 	c := []*node{}
 	for _, child := range n.children {
-		if child.id != childToRemove.id {
+		if child.kind != childToRemove.kind {
 			c = append(c, child)
 		}
 	}
@@ -149,13 +149,13 @@ func (g *generator) transformAlt(n *node) {
 	for _, child := range n.children {
 		g.transformAlt(child)
 	}
-	if len(n.children) > 1 && n.children[0].id == altId {
-		alt := &node{id: altId, parent: n}
+	if len(n.children) > 1 && n.children[0].kind == altKind {
+		alt := &node{kind: altKind, parent: n}
 		for _, child := range n.children {
-			if child.id == altId {
+			if child.kind == altKind {
 				if len(child.children) > 1 {
 					alt.children = append(alt.children, child)
-					child.id = groupId
+					child.kind = groupKind
 				} else {
 					child.children[0].parent = alt
 					alt.children = append(alt.children, child.children[0])
@@ -171,7 +171,7 @@ func (g *generator) transformAlt(n *node) {
 func (g *generator) transformSeeTheRules(n *node) {
 	toRemove := []*node{}
 	for _, child := range n.children {
-		if child.id == seeTheRulesId {
+		if child.kind == seeTheRulesKind {
 			toRemove = append(toRemove, child)
 		} else {
 			g.transformSeeTheRules(child)
@@ -183,12 +183,12 @@ func (g *generator) transformSeeTheRules(n *node) {
 }
 
 func (g *generator) printNode(n *node, indent string) {
-	if n.id == kwId {
-		fmt.Printf("%s%s(%s)\n", indent, n.id, n.value)
-	} else if n.id == bnfId || n.id == bnfDefId {
-		fmt.Printf("%s%s(%s)\n", indent, n.id, n.name)
+	if n.kind == kwKind {
+		fmt.Printf("%s%s(%s)\n", indent, n.kind, n.value)
+	} else if n.kind == bnfKind || n.kind == bnfDefKind {
+		fmt.Printf("%s%s(%s)\n", indent, n.kind, n.name)
 	} else {
-		fmt.Printf("%s%s\n", indent, n.id)
+		fmt.Printf("%s%s\n", indent, n.kind)
 	}
 	for _, child := range n.children {
 		g.printNode(child, indent+"  ")
@@ -197,36 +197,36 @@ func (g *generator) printNode(n *node, indent string) {
 
 func (g *generator) condenseRhs(n *node) {
 	for _, child := range n.children {
-		if child.id == bnfDefId {
+		if child.kind == bnfDefKind {
 			rhs := child.children[0]
 			if len(rhs.children) == 1 {
 				child.children[0] = rhs.children[0]
 			} else {
-				rhs.id = groupId
+				rhs.kind = groupKind
 			}
 		} else {
-			panic(fmt.Sprintf("expecting %s\n", bnfDefId))
+			panic(fmt.Sprintf("expecting %s\n", bnfDefKind))
 		}
 	}
 }
 
 func (g *generator) generateNode(w io.Writer, n *node) {
-	switch n.id {
-	case altId:
+	switch n.kind {
+	case altKind:
 		g.generateAlt(w, n)
-	case bnfId:
+	case bnfKind:
 		g.generateBnf(w, n)
-	case optId:
+	case optKind:
 		g.generateOpt(w, n)
-	case groupId:
+	case groupKind:
 		g.generateGroup(w, n)
-	case repeatId:
+	case repeatKind:
 		g.generateRepeat(w, n)
-	case terminalSymbolId:
+	case terminalSymbolKind:
 		g.generateTerminalSymbol(w, n)
-	case kwId:
+	case kwKind:
 		g.generateKw(w, n)
-	case fnId:
+	case fnKind:
 		n.generateFn(w, n)
 	}
 }
@@ -482,7 +482,7 @@ func (g *generator) randString(n int, charset string, escapeSequences []string) 
 }
 
 func (g *generator) enterLeave(w io.Writer, n *node) func() {
-	if n.parent.id == bnfDefId {
+	if n.parent.kind == bnfDefKind {
 		if n.enterFn != nil {
 			n.enterFn(w, n)
 		}

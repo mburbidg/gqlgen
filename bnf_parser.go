@@ -33,10 +33,10 @@ func (p *bnfParser) buildTree(decoder *xml.Decoder) *node {
 		case xml.ProcInst:
 		case xml.CharData:
 			if current != nil {
-				switch current.id {
-				case kwId:
+				switch current.kind {
+				case kwKind:
 					current.value = string(v)
-				case terminalSymbolId:
+				case terminalSymbolKind:
 					current.value = string(v)
 				default:
 				}
@@ -52,11 +52,11 @@ func (p *bnfParser) buildTree(decoder *xml.Decoder) *node {
 
 func (b *bnfParser) handleStartElement(start xml.StartElement, parent *node) *node {
 	n := &node{
-		id:       start.Name.Local,
+		kind:     start.Name.Local,
 		parent:   parent,
 		children: make([]*node, 0),
 	}
-	if n.id == bnfDefId || n.id == bnfId {
+	if n.kind == bnfDefKind || n.kind == bnfKind {
 		n.name = b.attrMap(start.Attr)["name"]
 	}
 	if parent != nil {

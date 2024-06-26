@@ -3,22 +3,22 @@ package gqlgen
 import "io"
 
 const (
-	grammarId        = "grammar"
-	bnfDefId         = "BNFdef"
-	rhsId            = "rhs"
-	altId            = "alt"
-	bnfId            = "BNF"
-	optId            = "opt"
-	groupId          = "group"
-	repeatId         = "repeat"
-	terminalSymbolId = "terminalsymbol"
-	kwId             = "kw"
-	fnId             = "fn"
-	seeTheRulesId    = "seeTheRules"
+	grammarKind        = "grammar"
+	bnfDefKind         = "BNFdef"
+	rhsKind            = "rhs"
+	altKind            = "alt"
+	bnfKind            = "BNF"
+	optKind            = "opt"
+	groupKind          = "group"
+	repeatKind         = "repeat"
+	terminalSymbolKind = "terminalsymbol"
+	kwKind             = "kw"
+	fnKind             = "fn"
+	seeTheRulesKind    = "seeTheRules"
 )
 
 type node struct {
-	id         string
+	kind       string
 	name       string
 	parent     *node
 	children   []*node

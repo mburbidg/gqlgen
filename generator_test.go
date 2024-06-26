@@ -36,5 +36,5 @@ func TestGenerate(t *testing.T) {
 	assert.NotNil(t, grammar)
 
 	g := newGenerator(grammar)
-	g.generate(os.Stdout, "label expression", grammar)
+	g.generate(os.Stdout, "create schema statement", grammar)
 }

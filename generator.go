@@ -24,6 +24,7 @@ func newGenerator(grammar *node) *generator {
 	g.transformSeeTheRules(g.grammar)
 	g.transformRepeat(g.grammar)
 	g.transformAlt(g.grammar)
+	g.condenseRhs(g.grammar)
 	g.buildRuleMap()
 
 	//g.printNode(g.grammar, "")
@@ -39,8 +40,12 @@ func (g *generator) walk(n *node, visitor func(n *node)) {
 }
 
 func (g *generator) generate(w io.Writer, startRule string, tree *node) {
-	g.generateNode(w, g.rules[startRule])
-	io.WriteString(w, "\n")
+	if start, ok := g.rules[startRule]; ok {
+		g.generateNode(w, start)
+		io.WriteString(w, "\n")
+	} else {
+		panic(fmt.Sprintf("unknown start rule: %s", startRule))
+	}
 }
 
 func (g *generator) buildRuleMap() {
@@ -190,10 +195,23 @@ func (g *generator) printNode(n *node, indent string) {
 	}
 }
 
+func (g *generator) condenseRhs(n *node) {
+	for _, child := range n.children {
+		if child.id == bnfDefId {
+			rhs := child.children[0]
+			if len(rhs.children) == 1 {
+				child.children[0] = rhs.children[0]
+			} else {
+				rhs.id = groupId
+			}
+		} else {
+			panic(fmt.Sprintf("expecting %s\n", bnfDefId))
+		}
+	}
+}
+
 func (g *generator) generateNode(w io.Writer, n *node) {
 	switch n.id {
-	case rhsId:
-		g.generateRhs(w, n)
 	case altId:
 		g.generateAlt(w, n)
 	case bnfId:
@@ -213,19 +231,8 @@ func (g *generator) generateNode(w io.Writer, n *node) {
 	}
 }
 
-func (g *generator) generateRhs(w io.Writer, n *node) {
-	if n.enterFn != nil {
-		n.enterFn(w, n)
-	}
-	for _, child := range n.children {
-		g.generateNode(w, child)
-	}
-	if n.leaveFn != nil {
-		n.leaveFn(w, n)
-	}
-}
-
 func (g *generator) generateBnf(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	if n, ok := g.rules[n.name]; ok {
 		g.generateNode(w, n)
 	} else {
@@ -234,11 +241,13 @@ func (g *generator) generateBnf(w io.Writer, n *node) {
 }
 
 func (g *generator) generateAlt(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	i := g.randomRange(0, len(n.children))
 	g.generateNode(w, n.children[i])
 }
 
 func (g *generator) generateOpt(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	i := g.randomRange(0, 2)
 	if i == 1 {
 		for _, child := range n.children {
@@ -248,12 +257,14 @@ func (g *generator) generateOpt(w io.Writer, n *node) {
 }
 
 func (g *generator) generateGroup(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	for _, child := range n.children {
 		g.generateNode(w, child)
 	}
 }
 
 func (g *generator) generateRepeat(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	cnt := g.randomRange(0, 5)
 	for i := 0; i < cnt; i++ {
 		for _, child := range n.children {
@@ -263,6 +274,7 @@ func (g *generator) generateRepeat(w io.Writer, n *node) {
 }
 
 func (g *generator) generateTerminalSymbol(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	_, err := io.WriteString(w, n.value)
 	if err != nil {
 		panic(err)
@@ -270,6 +282,7 @@ func (g *generator) generateTerminalSymbol(w io.Writer, n *node) {
 }
 
 func (g *generator) generateKw(w io.Writer, n *node) {
+	defer g.enterLeave(w, n)
 	_, err := io.WriteString(w, " "+n.value+" ")
 	if err != nil {
 		panic(err)
@@ -466,4 +479,19 @@ func (g *generator) randString(n int, charset string, escapeSequences []string) 
 		}
 	}
 	return str, nil
+}
+
+func (g *generator) enterLeave(w io.Writer, n *node) func() {
+	if n.parent.id == bnfDefId {
+		if n.enterFn != nil {
+			n.enterFn(w, n)
+		}
+		return func() {
+			if n.leaveFn != nil {
+				n.leaveFn(w, n)
+			}
+		}
+	} else {
+		return func() {}
+	}
 }

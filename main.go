@@ -12,7 +12,7 @@ func main() {
 	p := newBNFParser()
 	tree := p.parse(getInput())
 
-	g := newGenerator(tree)
+	g := newGenerator(tree, 6)
 	g.generate(os.Stdout, "GQL-program", tree)
 }
 

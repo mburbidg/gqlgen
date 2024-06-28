@@ -1,7 +1,9 @@
 package gqlgen
 
 import (
+	"bytes"
 	crand "crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -14,12 +16,15 @@ const (
 )
 
 type generator struct {
-	rules   map[string]*node
-	grammar *node
+	rules     map[string]*node
+	grammar   *node
+	maxRevist int
 }
 
-func newGenerator(grammar *node) *generator {
-	g := &generator{grammar: grammar}
+var errRecursionLevelExceeded = errors.New("recursion level exceeded")
+
+func newGenerator(grammar *node, maxRevisit int) *generator {
+	g := &generator{grammar: grammar, maxRevist: maxRevisit}
 
 	g.transformSeeTheRules(g.grammar)
 	g.transformRepeat(g.grammar)
@@ -27,8 +32,6 @@ func newGenerator(grammar *node) *generator {
 	g.condenseRhs(g.grammar)
 	g.assignId(g.grammar)
 	g.buildRuleMap()
-
-	g.printNode(g.grammar, "")
 
 	return g
 }
@@ -42,8 +45,20 @@ func (g *generator) walk(n *node, visitor func(n *node)) {
 
 func (g *generator) generate(w io.Writer, startRule string, tree *node) {
 	if start, ok := g.rules[startRule]; ok {
-		g.generateNode(w, start)
-		io.WriteString(w, "\n")
+		for {
+			buf := bytes.NewBufferString("")
+			err := g.generateNode(buf, start)
+			if err == nil {
+				str := buf.String()
+				io.WriteString(w, str)
+				io.WriteString(w, "\n")
+				return
+			} else {
+				//fmt.Printf("%s\n", err)
+			}
+			// Todo: Before retry, we need to reset the cnt property of all nodes in the grammar.
+			g.resetCnts(g.grammar)
+		}
 	} else {
 		panic(fmt.Sprintf("unknown start rule: %s", startRule))
 	}
@@ -154,6 +169,12 @@ func (g *generator) assignId(root *node) {
 	})
 }
 
+func (g *generator) resetCnts(root *node) {
+	g.walk(root, func(n *node) {
+		n.cnt = 0
+	})
+}
+
 func (g *generator) transformAlt(n *node) {
 	for _, child := range n.children {
 		g.transformAlt(child)
@@ -219,83 +240,102 @@ func (g *generator) condenseRhs(n *node) {
 	}
 }
 
-func (g *generator) generateNode(w io.Writer, n *node) {
+func (g *generator) generateNode(w io.Writer, n *node) error {
+	if n.cnt > g.maxRevist {
+		return errRecursionLevelExceeded
+	}
 	switch n.kind {
 	case altKind:
-		g.generateAlt(w, n)
+		return g.generateAlt(w, n)
 	case bnfKind:
-		g.generateBnf(w, n)
+		return g.generateBnf(w, n)
 	case optKind:
-		g.generateOpt(w, n)
+		return g.generateOpt(w, n)
 	case groupKind:
-		g.generateGroup(w, n)
+		return g.generateGroup(w, n)
 	case repeatKind:
-		g.generateRepeat(w, n)
+		return g.generateRepeat(w, n)
 	case terminalSymbolKind:
-		g.generateTerminalSymbol(w, n)
+		return g.generateTerminalSymbol(w, n)
 	case kwKind:
-		g.generateKw(w, n)
+		return g.generateKw(w, n)
 	case fnKind:
 		n.generateFn(w, n)
 	}
+	return nil
 }
 
-func (g *generator) generateBnf(w io.Writer, n *node) {
+func (g *generator) generateBnf(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	if n, ok := g.rules[n.name]; ok {
-		g.generateNode(w, n)
+		return g.generateNode(w, n)
 	} else {
 		panic("rule not found: " + n.name)
 	}
+	return nil
 }
 
-func (g *generator) generateAlt(w io.Writer, n *node) {
+func (g *generator) generateAlt(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	i := g.randomRange(0, len(n.children))
-	g.generateNode(w, n.children[i])
+	return g.generateNode(w, n.children[i])
 }
 
-func (g *generator) generateOpt(w io.Writer, n *node) {
+func (g *generator) generateOpt(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	i := g.randomRange(0, 2)
 	if i == 1 {
 		for _, child := range n.children {
-			g.generateNode(w, child)
+			err := g.generateNode(w, child)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-func (g *generator) generateGroup(w io.Writer, n *node) {
+func (g *generator) generateGroup(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	for _, child := range n.children {
-		g.generateNode(w, child)
+		err := g.generateNode(w, child)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (g *generator) generateRepeat(w io.Writer, n *node) {
+func (g *generator) generateRepeat(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	cnt := g.randomRange(0, 5)
 	for i := 0; i < cnt; i++ {
 		for _, child := range n.children {
-			g.generateNode(w, child)
+			err := g.generateNode(w, child)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-func (g *generator) generateTerminalSymbol(w io.Writer, n *node) {
+func (g *generator) generateTerminalSymbol(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	_, err := io.WriteString(w, n.value)
 	if err != nil {
 		panic(err)
 	}
+	return nil
 }
 
-func (g *generator) generateKw(w io.Writer, n *node) {
+func (g *generator) generateKw(w io.Writer, n *node) error {
 	defer g.enterLeave(w, n)
 	_, err := io.WriteString(w, " "+n.value+" ")
 	if err != nil {
 		panic(err)
 	}
+	return nil
 }
 
 var charset = "abcdefghijklmnopqursuvwxyzABCDEFGHIJKLMONPQUSTUVWXYZ _.!?0123456789ŨŪŹŕùûáéòµ¶"
@@ -491,16 +531,14 @@ func (g *generator) randString(n int, charset string, escapeSequences []string) 
 }
 
 func (g *generator) enterLeave(w io.Writer, n *node) func() {
-	if n.parent.kind == bnfDefKind {
-		if n.enterFn != nil {
-			n.enterFn(w, n)
+	n.cnt++
+	if n.enterFn != nil {
+		n.enterFn(w, n)
+	}
+	return func() {
+		if n.leaveFn != nil {
+			n.leaveFn(w, n)
 		}
-		return func() {
-			if n.leaveFn != nil {
-				n.leaveFn(w, n)
-			}
-		}
-	} else {
-		return func() {}
+		n.cnt--
 	}
 }

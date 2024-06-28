@@ -20,6 +20,7 @@ const (
 type node struct {
 	id         int
 	kind       string
+	cnt        int
 	name       string
 	parent     *node
 	children   []*node

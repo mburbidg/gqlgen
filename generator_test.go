@@ -20,7 +20,8 @@ func TestNewGenerator(t *testing.T) {
 	grammar := p.parse(r)
 	assert.NotNil(t, grammar)
 
-	newGenerator(grammar)
+	g := newGenerator(grammar, 6)
+	g.printNode(g.grammar, "")
 }
 
 func TestGenerate(t *testing.T) {
@@ -35,6 +36,7 @@ func TestGenerate(t *testing.T) {
 	grammar := p.parse(r)
 	assert.NotNil(t, grammar)
 
-	g := newGenerator(grammar)
-	g.generate(os.Stdout, "create schema statement", grammar)
+	g := newGenerator(grammar, 6)
+	//g.generate(os.Stdout, "GQL-program", grammar)
+	g.generate(os.Stdout, "select statement", grammar)
 }

@@ -1,4 +1,4 @@
-package gqlgen
+package main
 
 import (
 	"bufio"
@@ -38,5 +38,5 @@ func TestGenerate(t *testing.T) {
 
 	g := newGenerator(grammar, 6)
 	//g.generate(os.Stdout, "GQL-program", grammar)
-	g.generate(os.Stdout, "select statement", grammar)
+	g.generate(os.Stdout, "value expression", grammar, false)
 }

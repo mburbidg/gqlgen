@@ -1,4 +1,4 @@
-package gqlgen
+package main
 
 import (
 	"bytes"
@@ -43,7 +43,7 @@ func (g *generator) walk(n *node, visitor func(n *node)) {
 	}
 }
 
-func (g *generator) generate(w io.Writer, startRule string, tree *node) {
+func (g *generator) generate(w io.Writer, startRule string, tree *node, verbose bool) {
 	if start, ok := g.rules[startRule]; ok {
 		for {
 			buf := bytes.NewBufferString("")
@@ -54,10 +54,10 @@ func (g *generator) generate(w io.Writer, startRule string, tree *node) {
 				io.WriteString(w, "\n")
 				return
 			} else {
-				//fmt.Printf("%s\n", err)
+				if verbose {
+					fmt.Printf("%s\n", err)
+				}
 			}
-			// Todo: Before retry, we need to reset the cnt property of all nodes in the grammar.
-			g.resetCnts(g.grammar)
 		}
 	} else {
 		panic(fmt.Sprintf("unknown start rule: %s", startRule))
@@ -171,6 +171,9 @@ func (g *generator) assignId(root *node) {
 
 func (g *generator) resetCnts(root *node) {
 	g.walk(root, func(n *node) {
+		if n.cnt != 0 {
+			fmt.Printf("cnt for (%s, %d) not zero: %d\n", n.kind, n.id, n.cnt)
+		}
 		n.cnt = 0
 	})
 }
@@ -241,6 +244,7 @@ func (g *generator) condenseRhs(n *node) {
 }
 
 func (g *generator) generateNode(w io.Writer, n *node) error {
+	defer g.enterLeave(w, n)()
 	if n.cnt > g.maxRevist {
 		return errRecursionLevelExceeded
 	}
@@ -266,7 +270,6 @@ func (g *generator) generateNode(w io.Writer, n *node) error {
 }
 
 func (g *generator) generateBnf(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	if n, ok := g.rules[n.name]; ok {
 		return g.generateNode(w, n)
 	} else {
@@ -276,13 +279,12 @@ func (g *generator) generateBnf(w io.Writer, n *node) error {
 }
 
 func (g *generator) generateAlt(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	i := g.randomRange(0, len(n.children))
+	//fmt.Printf("alt id=%d, i=%d, child=%d\n", n.id, i, n.children[0].id)
 	return g.generateNode(w, n.children[i])
 }
 
 func (g *generator) generateOpt(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	i := g.randomRange(0, 2)
 	if i == 1 {
 		for _, child := range n.children {
@@ -296,7 +298,6 @@ func (g *generator) generateOpt(w io.Writer, n *node) error {
 }
 
 func (g *generator) generateGroup(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	for _, child := range n.children {
 		err := g.generateNode(w, child)
 		if err != nil {
@@ -307,7 +308,6 @@ func (g *generator) generateGroup(w io.Writer, n *node) error {
 }
 
 func (g *generator) generateRepeat(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	cnt := g.randomRange(0, 5)
 	for i := 0; i < cnt; i++ {
 		for _, child := range n.children {
@@ -321,7 +321,6 @@ func (g *generator) generateRepeat(w io.Writer, n *node) error {
 }
 
 func (g *generator) generateTerminalSymbol(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	_, err := io.WriteString(w, n.value)
 	if err != nil {
 		panic(err)
@@ -330,7 +329,6 @@ func (g *generator) generateTerminalSymbol(w io.Writer, n *node) error {
 }
 
 func (g *generator) generateKw(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)
 	_, err := io.WriteString(w, " "+n.value+" ")
 	if err != nil {
 		panic(err)

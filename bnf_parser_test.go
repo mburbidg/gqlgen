@@ -1,4 +1,4 @@
-package gqlgen
+package main
 
 import (
 	"bufio"

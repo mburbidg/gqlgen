@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 )
 
@@ -43,16 +41,12 @@ func (g *generator) walk(n *node, visitor func(n *node)) {
 	}
 }
 
-func (g *generator) generate(w io.Writer, startRule string, tree *node, verbose bool) {
+func (g *generator) generate(startRule string, tree *node, verbose bool) string {
 	if start, ok := g.rules[startRule]; ok {
 		for {
-			buf := bytes.NewBufferString("")
-			err := g.generateNode(buf, start)
+			s, err := g.generateNode(start)
 			if err == nil {
-				str := buf.String()
-				io.WriteString(w, str)
-				io.WriteString(w, "\n")
-				return
+				return s
 			} else {
 				if verbose {
 					fmt.Printf("%s\n", err)
@@ -243,97 +237,96 @@ func (g *generator) condenseRhs(n *node) {
 	}
 }
 
-func (g *generator) generateNode(w io.Writer, n *node) error {
-	defer g.enterLeave(w, n)()
+func (g *generator) generateNode(n *node) (string, error) {
+	defer g.enterLeave(n)()
 	if n.cnt > g.maxRevist {
-		return errRecursionLevelExceeded
+		return "", errRecursionLevelExceeded
 	}
+	//fmt.Printf("generate node: kind=%s, id=%d\n", n.kind, n.id)
 	switch n.kind {
 	case altKind:
-		return g.generateAlt(w, n)
+		return g.generateAlt(n)
 	case bnfKind:
-		return g.generateBnf(w, n)
+		return g.generateBnf(n)
 	case optKind:
-		return g.generateOpt(w, n)
+		return g.generateOpt(n)
 	case groupKind:
-		return g.generateGroup(w, n)
+		return g.generateGroup(n)
 	case repeatKind:
-		return g.generateRepeat(w, n)
+		return g.generateRepeat(n)
 	case terminalSymbolKind:
-		return g.generateTerminalSymbol(w, n)
+		return g.generateTerminalSymbol(n)
 	case kwKind:
-		return g.generateKw(w, n)
+		return g.generateKw(n)
 	case fnKind:
-		n.generateFn(w, n)
+		return n.generateFn(n), nil
 	}
-	return nil
+	return "", nil
 }
 
-func (g *generator) generateBnf(w io.Writer, n *node) error {
+func (g *generator) generateBnf(n *node) (string, error) {
 	if n, ok := g.rules[n.name]; ok {
-		return g.generateNode(w, n)
+		return g.generateNode(n)
 	} else {
 		panic("rule not found: " + n.name)
 	}
-	return nil
+	return "", nil
 }
 
-func (g *generator) generateAlt(w io.Writer, n *node) error {
+func (g *generator) generateAlt(n *node) (string, error) {
 	i := g.randomRange(0, len(n.children))
 	//fmt.Printf("alt id=%d, i=%d, child=%d\n", n.id, i, n.children[0].id)
-	return g.generateNode(w, n.children[i])
+	return g.generateNode(n.children[i])
 }
 
-func (g *generator) generateOpt(w io.Writer, n *node) error {
+func (g *generator) generateOpt(n *node) (string, error) {
+	result := ""
 	i := g.randomRange(0, 2)
 	if i == 1 {
 		for _, child := range n.children {
-			err := g.generateNode(w, child)
+			s, err := g.generateNode(child)
 			if err != nil {
-				return err
+				return "", err
 			}
+			result += s
 		}
 	}
-	return nil
+	return result, nil
 }
 
-func (g *generator) generateGroup(w io.Writer, n *node) error {
+func (g *generator) generateGroup(n *node) (string, error) {
+	result := ""
 	for _, child := range n.children {
-		err := g.generateNode(w, child)
+		s, err := g.generateNode(child)
 		if err != nil {
-			return err
+			return "", err
 		}
+		result += s
 	}
-	return nil
+	return result, nil
 }
 
-func (g *generator) generateRepeat(w io.Writer, n *node) error {
+func (g *generator) generateRepeat(n *node) (string, error) {
+	result := ""
 	cnt := g.randomRange(0, 5)
 	for i := 0; i < cnt; i++ {
 		for _, child := range n.children {
-			err := g.generateNode(w, child)
+			s, err := g.generateNode(child)
 			if err != nil {
-				return err
+				return "", err
 			}
+			result += s
 		}
 	}
-	return nil
+	return result, nil
 }
 
-func (g *generator) generateTerminalSymbol(w io.Writer, n *node) error {
-	_, err := io.WriteString(w, n.value)
-	if err != nil {
-		panic(err)
-	}
-	return nil
+func (g *generator) generateTerminalSymbol(n *node) (string, error) {
+	return n.value, nil
 }
 
-func (g *generator) generateKw(w io.Writer, n *node) error {
-	_, err := io.WriteString(w, " "+n.value+" ")
-	if err != nil {
-		panic(err)
-	}
-	return nil
+func (g *generator) generateKw(n *node) (string, error) {
+	return " " + n.value + " ", nil
 }
 
 var charset = "abcdefghijklmnopqursuvwxyzABCDEFGHIJKLMONPQUSTUVWXYZ _.!?0123456789ŨŪŹŕùûáéòµ¶"
@@ -351,7 +344,7 @@ var escapeSequences = []string{
 	`\UF1A4`,
 }
 
-func (g *generator) generateSingleQuotedCharacterSequence(w io.Writer, n *node) {
+func (g *generator) generateSingleQuotedCharacterSequence(n *node) string {
 	cnt := g.randomRange(0, 50)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
@@ -359,24 +352,17 @@ func (g *generator) generateSingleQuotedCharacterSequence(w io.Writer, n *node) 
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.WriteString(w, "@\""+guts+"\"")
-		if err != nil {
-			panic(err)
-		}
-
+		return "@\"" + guts + "\""
 	} else {
 		guts, err := g.randString(cnt, charset+"\"`", append(escapeSequences, "''"))
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.WriteString(w, "'"+guts+"'")
-		if err != nil {
-			panic(err)
-		}
+		return "'" + guts + "'"
 	}
 }
 
-func (g *generator) generateDoubleQuotedCharacterSequence(w io.Writer, n *node) {
+func (g *generator) generateDoubleQuotedCharacterSequence(n *node) string {
 	cnt := g.randomRange(0, 50)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
@@ -384,24 +370,17 @@ func (g *generator) generateDoubleQuotedCharacterSequence(w io.Writer, n *node) 
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.WriteString(w, "@\""+guts+"\"")
-		if err != nil {
-			panic(err)
-		}
-
+		return "@\"" + guts + "\""
 	} else {
 		guts, err := g.randString(cnt, charset+"'`", append(escapeSequences, `""`))
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.WriteString(w, "\""+guts+"\"")
-		if err != nil {
-			panic(err)
-		}
+		return "\"" + guts + "\""
 	}
 }
 
-func (g *generator) generateAccentQuotedCharacterSequence(w io.Writer, n *node) {
+func (g *generator) generateAccentQuotedCharacterSequence(n *node) string {
 	cnt := g.randomRange(0, 50)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
@@ -409,97 +388,74 @@ func (g *generator) generateAccentQuotedCharacterSequence(w io.Writer, n *node) 
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.WriteString(w, "@`"+guts+"`")
-		if err != nil {
-			panic(err)
-		}
-
+		return "@`" + guts + "`"
 	} else {
 		guts, err := g.randString(cnt, charset+"\"'", append(escapeSequences, "``"))
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.WriteString(w, "`"+guts+"`")
-		if err != nil {
-			panic(err)
-		}
+		return "`" + guts + "`"
 	}
 }
 
-func (g *generator) generateCharacterRepresentation(w io.Writer, n *node) {
+func (g *generator) generateCharacterRepresentation(n *node) string {
 	r, err := randChar(charset)
 	if err != nil {
 		panic(err)
 	}
-	_, err = io.WriteString(w, string(r))
-	if err != nil {
-		panic(err)
-	}
+	return string(r)
 }
 
-func (g *generator) generateStringLiteralCharacter(w io.Writer, n *node) {
-	_, err := io.WriteString(w, "somerandomstring")
-	if err != nil {
-		panic(err)
-	}
+func (g *generator) generateStringLiteralCharacter(n *node) string {
+	return "somerandomstring"
 }
 
-func (g *generator) generateIdentifierStart(w io.Writer, n *node) {
+func (g *generator) generateIdentifierStart(n *node) string {
 	r, err := randChar("_abcdefghijklmnopqursuvwxyzABCDEFGHIJKLMONPQUSTUVWXYZ")
 	if err != nil {
 		panic(err)
 	}
-	_, err = io.WriteString(w, string(r))
-	if err != nil {
-		panic(err)
-	}
+	return string(r)
 }
 
-func (g *generator) generateIdentifierExtend(w io.Writer, n *node) {
+func (g *generator) generateIdentifierExtend(n *node) string {
 	r, err := randChar("_abcdefghijklmnopqursuvwxyzABCDEFGHIJKLMONPQUSTUVWXYZ0123456789")
 	if err != nil {
 		panic(err)
 	}
-	_, err = io.WriteString(w, string(r))
-	if err != nil {
-		panic(err)
-	}
+	return string(r)
 }
 
-func (g *generator) generateWhitespace(w io.Writer, n *node) {
-	_, err := io.WriteString(w, " ")
-	if err != nil {
-		panic(err)
-	}
+func (g *generator) generateWhitespace(n *node) string {
+	return " "
 }
 
-func (g *generator) generateTruncatingWhitespace(w io.Writer, n *node) {
-	_, err := io.WriteString(w, " ")
-	if err != nil {
-		panic(err)
-	}
+func (g *generator) generateTruncatingWhitespace(n *node) string {
+	return " "
 }
 
-func (g *generator) generateBidirectionControlCharacter(w io.Writer, n *node) {
+func (g *generator) generateBidirectionControlCharacter(n *node) string {
+	return ""
 }
 
-func (g *generator) generateSimpleCommentCharacter(w io.Writer, n *node) {
+func (g *generator) generateSimpleCommentCharacter(n *node) string {
+	return ""
 }
 
-func (g *generator) generateBracketedCommentContents(w io.Writer, n *node) {
+func (g *generator) generateBracketedCommentContents(n *node) string {
+	return ""
 }
 
-func (g *generator) generateNewline(w io.Writer, n *node) {
-	_, err := io.WriteString(w, "\n")
-	if err != nil {
-		panic(err)
-	}
+func (g *generator) generateNewline(n *node) string {
+	return "\n"
 }
 
-func (g *generator) generateOtherDigit(w io.Writer, n *node) {
+func (g *generator) generateOtherDigit(n *node) string {
+	return ""
 }
 
-func (g *generator) generateOtherLanguageCharacter(w io.Writer, n *node) {
+func (g *generator) generateOtherLanguageCharacter(n *node) string {
+	return ""
 }
 
 func (g *generator) randomRange(min, max int) int {
@@ -528,15 +484,9 @@ func (g *generator) randString(n int, charset string, escapeSequences []string) 
 	return str, nil
 }
 
-func (g *generator) enterLeave(w io.Writer, n *node) func() {
+func (g *generator) enterLeave(n *node) func() {
 	n.cnt++
-	if n.enterFn != nil {
-		n.enterFn(w, n)
-	}
 	return func() {
-		if n.leaveFn != nil {
-			n.leaveFn(w, n)
-		}
 		n.cnt--
 	}
 }

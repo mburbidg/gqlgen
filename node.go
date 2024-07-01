@@ -1,7 +1,5 @@
 package main
 
-import "io"
-
 const (
 	grammarKind        = "grammar"
 	bnfDefKind         = "BNFdef"
@@ -25,7 +23,5 @@ type node struct {
 	parent     *node
 	children   []*node
 	value      string
-	generateFn func(w io.Writer, n *node)
-	enterFn    func(w io.Writer, n *node)
-	leaveFn    func(w io.Writer, n *node)
+	generateFn func(n *node) string
 }

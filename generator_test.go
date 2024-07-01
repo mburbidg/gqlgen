@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
@@ -37,6 +38,6 @@ func TestGenerate(t *testing.T) {
 	assert.NotNil(t, grammar)
 
 	g := newGenerator(grammar, 6)
-	//g.generate(os.Stdout, "GQL-program", grammar)
-	g.generate(os.Stdout, "value expression", grammar, false)
+	s := g.generate("value expression", grammar, false)
+	fmt.Printf("%s\n", s)
 }

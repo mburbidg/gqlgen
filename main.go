@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -15,7 +16,8 @@ func main() {
 
 	g := newGenerator(tree, 6)
 	for i := 0; i < cnt; i++ {
-		g.generate(os.Stdout, startRule, tree, verbose)
+		s := g.generate(startRule, tree, verbose)
+		fmt.Printf("%s\n", s)
 	}
 }
 

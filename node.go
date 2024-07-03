@@ -19,6 +19,7 @@ type node struct {
 	id         int
 	kind       string
 	cnt        int
+	refDepth   int
 	name       string
 	parent     *node
 	children   []*node

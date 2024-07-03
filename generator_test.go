@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewGenerator(t *testing.T) {
-	f, err := os.Open("bnf.xml")
+	f, err := os.Open("test.xml")
 	if err != nil {
 		log.Fatalf("error opening xml: %s\n", err)
 	}

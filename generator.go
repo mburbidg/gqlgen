@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 )
 
@@ -30,6 +31,7 @@ func newGenerator(grammar *node, maxRevisit int) *generator {
 	g.condenseRhs(g.grammar)
 	g.assignId(g.grammar)
 	g.buildRuleMap()
+	g.calcRefDepths()
 
 	return g
 }
@@ -44,7 +46,7 @@ func (g *generator) walk(n *node, visitor func(n *node)) {
 func (g *generator) generate(startRule string, tree *node, verbose bool) string {
 	if start, ok := g.rules[startRule]; ok {
 		for {
-			s, err := g.generateNode(start)
+			s, err := g.generateNode(start, false)
 			if err == nil {
 				return s
 			} else {
@@ -163,15 +165,6 @@ func (g *generator) assignId(root *node) {
 	})
 }
 
-func (g *generator) resetCnts(root *node) {
-	g.walk(root, func(n *node) {
-		if n.cnt != 0 {
-			fmt.Printf("cnt for (%s, %d) not zero: %d\n", n.kind, n.id, n.cnt)
-		}
-		n.cnt = 0
-	})
-}
-
 func (g *generator) transformAlt(n *node) {
 	for _, child := range n.children {
 		g.transformAlt(child)
@@ -213,9 +206,9 @@ func (g *generator) printNode(n *node, indent string) {
 	if n.kind == kwKind {
 		fmt.Printf("%s%s(%d, %s)\n", indent, n.kind, n.id, n.value)
 	} else if n.kind == bnfKind || n.kind == bnfDefKind {
-		fmt.Printf("%s%s(%d, %s)\n", indent, n.kind, n.id, n.name)
+		fmt.Printf("%s%s(%d, %s) refDepth=%d\n", indent, n.kind, n.id, n.name, n.refDepth)
 	} else {
-		fmt.Printf("%s%s(%d)\n", indent, n.kind, n.id)
+		fmt.Printf("%s%s(%d) refDepth=%d\n", indent, n.kind, n.id, n.refDepth)
 	}
 	for _, child := range n.children {
 		g.printNode(child, indent+"  ")
@@ -237,54 +230,176 @@ func (g *generator) condenseRhs(n *node) {
 	}
 }
 
-func (g *generator) generateNode(n *node) (string, error) {
+func (g *generator) calcRefDepths() {
+	leafRules := map[*node]string{}
+	interiorRules := map[*node]string{}
+
+	// First find all the leaf rules. Their refDepth is 0, the default value.
+	for k, v := range g.rules {
+		hasRef := false
+		g.walk(v, func(n *node) {
+			if n.kind == bnfKind {
+				hasRef = true
+			}
+		})
+		if hasRef {
+			interiorRules[v] = k
+		} else {
+			leafRules[v] = k
+		}
+	}
+
+	for len(interiorRules) > 0 {
+		rule, name := g.getRule(interiorRules)
+		if rule == nil {
+			break
+		}
+		g.calcRefDepthForRule(rule, name, interiorRules, leafRules, map[*node]int{})
+	}
+}
+
+func (g *generator) calcRefDepthForRule(rule *node, name string, interiorRules map[*node]string, leafRules map[*node]string, seen map[*node]int) {
+	if cnt, ok := seen[rule]; ok {
+		seen[rule] = cnt + 1
+	} else {
+		seen[rule] = 1
+	}
+	delete(interiorRules, rule)
+	g.calcRefDepthForNode(rule, interiorRules, leafRules, seen, 0)
+	seen[rule] = seen[rule] - 1
+	if seen[rule] == 0 {
+		delete(seen, rule)
+	}
+}
+
+func (g *generator) calcRefDepthForNode(n *node, interiorRules map[*node]string, leafRules map[*node]string, seen map[*node]int, depth int) {
+	switch n.kind {
+	case kwKind, terminalSymbolKind:
+		n.refDepth = depth
+	case groupKind, repeatKind, optKind:
+		mx := 0
+		for _, child := range n.children {
+			g.calcRefDepthForNode(child, interiorRules, leafRules, seen, depth)
+			if child.refDepth > mx {
+				mx = child.refDepth
+			}
+		}
+		n.refDepth = g.incRefDepth(n.refDepth, mx)
+	case altKind:
+		mn := 0
+		for _, child := range n.children {
+			g.calcRefDepthForNode(child, interiorRules, leafRules, seen, depth)
+			if child.refDepth < mn {
+				mn = child.refDepth
+			}
+		}
+		n.refDepth = g.incRefDepth(n.refDepth, mn)
+	case bnfKind:
+		rule, ok := g.rules[n.name]
+		if !ok {
+			panic(fmt.Sprintf("rule named %s not found", n.name))
+		}
+		if _, ok = seen[rule]; ok {
+			n.refDepth = math.MaxInt
+		} else {
+			name, ok := interiorRules[rule]
+			if ok {
+				g.calcRefDepthForRule(rule, name, interiorRules, leafRules, seen)
+			}
+			n.refDepth = g.incRefDepth(rule.refDepth, 1)
+		}
+	}
+}
+
+func (g *generator) incRefDepth(depth int, by int) int {
+	if depth != math.MaxInt {
+		return depth + by
+	}
+	return depth
+}
+
+func (g *generator) getRule(rules map[*node]string) (*node, string) {
+	for k, v := range rules {
+		delete(rules, k)
+		return k, v
+	}
+	return nil, ""
+}
+
+func (g *generator) generateNode(n *node, shortestPath bool) (string, error) {
 	defer g.enterLeave(n)()
 	if n.cnt > g.maxRevist {
-		return "", errRecursionLevelExceeded
+		shortestPath = true
 	}
 	//fmt.Printf("generate node: kind=%s, id=%d\n", n.kind, n.id)
 	switch n.kind {
 	case altKind:
-		return g.generateAlt(n)
+		return g.generateAlt(n, shortestPath)
 	case bnfKind:
-		return g.generateBnf(n)
+		return g.generateBnf(n, shortestPath)
 	case optKind:
-		return g.generateOpt(n)
+		return g.generateOpt(n, shortestPath)
 	case groupKind:
-		return g.generateGroup(n)
+		return g.generateGroup(n, shortestPath)
 	case repeatKind:
-		return g.generateRepeat(n)
+		return g.generateRepeat(n, shortestPath)
 	case terminalSymbolKind:
-		return g.generateTerminalSymbol(n)
+		return g.generateTerminalSymbol(n, shortestPath)
 	case kwKind:
-		return g.generateKw(n)
+		return g.generateKw(n, shortestPath)
 	case fnKind:
 		return n.generateFn(n), nil
 	}
 	return "", nil
 }
 
-func (g *generator) generateBnf(n *node) (string, error) {
+func (g *generator) generateBnf(n *node, shortestPath bool) (string, error) {
 	if n, ok := g.rules[n.name]; ok {
-		return g.generateNode(n)
+		return g.generateNode(n, shortestPath)
 	} else {
 		panic("rule not found: " + n.name)
 	}
 	return "", nil
 }
 
-func (g *generator) generateAlt(n *node) (string, error) {
-	i := g.randomRange(0, len(n.children))
+func (g *generator) generateAlt(n *node, shortestPath bool) (string, error) {
+	if shortestPath {
+		i := g.getShortestPath(n)
+		return g.generateNode(n.children[i], shortestPath)
+	} else {
+		i := g.randomRange(0, len(n.children))
+		return g.generateNode(n.children[i], shortestPath)
+	}
 	//fmt.Printf("alt id=%d, i=%d, child=%d\n", n.id, i, n.children[0].id)
-	return g.generateNode(n.children[i])
 }
 
-func (g *generator) generateOpt(n *node) (string, error) {
+func (g *generator) getShortestPath(n *node) int {
+	j := 0
+	mn := math.MaxInt
+	for i, child := range n.children {
+		if child.refDepth < mn {
+			mn = child.refDepth
+			j = i
+		}
+	}
+	return j
+}
+
+func (g *generator) getTerminatingPath(n *node) int {
+	for {
+		i := g.randomRange(0, len(n.children))
+		if n.children[i].refDepth != math.MaxInt {
+			return i
+		}
+	}
+}
+
+func (g *generator) generateOpt(n *node, shortestPath bool) (string, error) {
 	result := ""
 	i := g.randomRange(0, 2)
 	if i == 1 {
 		for _, child := range n.children {
-			s, err := g.generateNode(child)
+			s, err := g.generateNode(child, shortestPath)
 			if err != nil {
 				return "", err
 			}
@@ -294,10 +409,10 @@ func (g *generator) generateOpt(n *node) (string, error) {
 	return result, nil
 }
 
-func (g *generator) generateGroup(n *node) (string, error) {
+func (g *generator) generateGroup(n *node, shortestPath bool) (string, error) {
 	result := ""
 	for _, child := range n.children {
-		s, err := g.generateNode(child)
+		s, err := g.generateNode(child, shortestPath)
 		if err != nil {
 			return "", err
 		}
@@ -306,12 +421,12 @@ func (g *generator) generateGroup(n *node) (string, error) {
 	return result, nil
 }
 
-func (g *generator) generateRepeat(n *node) (string, error) {
+func (g *generator) generateRepeat(n *node, shortestPath bool) (string, error) {
 	result := ""
 	cnt := g.randomRange(0, 5)
 	for i := 0; i < cnt; i++ {
 		for _, child := range n.children {
-			s, err := g.generateNode(child)
+			s, err := g.generateNode(child, shortestPath)
 			if err != nil {
 				return "", err
 			}
@@ -321,11 +436,11 @@ func (g *generator) generateRepeat(n *node) (string, error) {
 	return result, nil
 }
 
-func (g *generator) generateTerminalSymbol(n *node) (string, error) {
+func (g *generator) generateTerminalSymbol(n *node, shortestPath bool) (string, error) {
 	return n.value, nil
 }
 
-func (g *generator) generateKw(n *node) (string, error) {
+func (g *generator) generateKw(n *node, shortestPath bool) (string, error) {
 	return " " + n.value + " ", nil
 }
 

@@ -1,5 +1,120 @@
-<BNFdef name="session reset arguments" predicative="no">
-   <rhs>
-      <seeTheRules/>
-   </rhs>
-</BNFdef>
+<grammar>
+   <BNFdef name="label expression" predicative="no">
+      <rhs>
+         <alt>
+            <BNF name="label term"/>
+         </alt>
+         <alt>
+            <BNF name="label disjunction"/>
+         </alt>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label disjunction" predicative="no">
+      <rhs>
+         <BNF name="label expression"/>
+         <BNF name="vertical bar"/>
+         <BNF name="label term"/>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label term" predicative="no">
+      <rhs>
+         <alt>
+            <BNF name="label factor"/>
+         </alt>
+         <alt>
+            <BNF name="label conjunction"/>
+         </alt>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label conjunction" predicative="no">
+      <rhs>
+         <BNF name="label term"/>
+         <BNF name="ampersand"/>
+         <BNF name="label factor"/>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label factor" predicative="no">
+      <rhs>
+         <alt>
+            <BNF name="label primary"/>
+         </alt>
+         <alt>
+            <BNF name="label negation"/>
+         </alt>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label negation" predicative="no">
+      <rhs>
+         <BNF name="exclamation mark"/>
+         <BNF name="label primary"/>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label primary" predicative="no">
+      <rhs>
+         <alt>
+            <BNF name="label name"/>
+         </alt>
+         <alt>
+            <BNF name="wildcard label"/>
+         </alt>
+         <alt>
+            <BNF name="parenthesized label expression"/>
+         </alt>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="wildcard label" predicative="no">
+      <rhs>
+         <BNF name="percent"/>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="parenthesized label expression" predicative="no">
+      <rhs>
+         <BNF name="left paren"/>
+         <BNF name="label expression"/>
+         <BNF name="right paren"/>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="label name" predicative="no">
+      <rhs>
+         <alt>
+            <terminalsymbol>a</terminalsymbol>
+         </alt>
+         <alt>
+            <terminalsymbol>b</terminalsymbol>
+         </alt>
+         <alt>
+            <terminalsymbol>c</terminalsymbol>
+         </alt>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="vertical bar" predicative="no">
+      <rhs>
+         <terminalsymbol unicode="007C">|</terminalsymbol>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="ampersand" predicative="no">
+      <rhs>
+         <terminalsymbol unicode="0026">&amp;</terminalsymbol>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="exclamation mark" predicative="no">
+      <rhs>
+         <terminalsymbol unicode="0021">!</terminalsymbol>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="percent" predicative="no">
+      <rhs>
+         <terminalsymbol unicode="0025">%</terminalsymbol>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="left paren" predicative="no">
+      <rhs>
+         <terminalsymbol unicode="0028">(</terminalsymbol>
+      </rhs>
+   </BNFdef>
+   <BNFdef name="right paren" predicative="no">
+      <rhs>
+         <terminalsymbol unicode="0029">)</terminalsymbol>
+      </rhs>
+   </BNFdef>
+</grammar>

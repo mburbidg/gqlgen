@@ -21,7 +21,7 @@ func TestNewGenerator(t *testing.T) {
 	grammar := p.parse(r)
 	assert.NotNil(t, grammar)
 
-	g := newGenerator(grammar, 6)
+	g := newGenerator(grammar, 6, "label expression")
 	g.printNode(g.grammar, "")
 }
 
@@ -37,7 +37,7 @@ func TestGenerate(t *testing.T) {
 	grammar := p.parse(r)
 	assert.NotNil(t, grammar)
 
-	g := newGenerator(grammar, 6)
-	s := g.generate("value expression", grammar, false)
+	g := newGenerator(grammar, 6, "GQL-program")
+	s := g.generate("GQL-program", grammar, false)
 	fmt.Printf("%s\n", s)
 }

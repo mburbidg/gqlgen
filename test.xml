@@ -117,4 +117,9 @@
          <terminalsymbol unicode="0029">)</terminalsymbol>
       </rhs>
    </BNFdef>
+   <BNFdef name="foo" predicative="no">
+      <rhs>
+         <terminalsymbol>foo</terminalsymbol>
+      </rhs>
+   </BNFdef>
 </grammar>

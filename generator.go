@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 )
 
 const (
@@ -22,7 +23,7 @@ type generator struct {
 
 var errRecursionLevelExceeded = errors.New("recursion level exceeded")
 
-func newGenerator(grammar *node, maxRevisit int) *generator {
+func newGenerator(grammar *node, maxRevisit int, rootRule string) *generator {
 	g := &generator{grammar: grammar, maxRevist: maxRevisit}
 
 	g.transformSeeTheRules(g.grammar)
@@ -31,7 +32,7 @@ func newGenerator(grammar *node, maxRevisit int) *generator {
 	g.condenseRhs(g.grammar)
 	g.assignId(g.grammar)
 	g.buildRuleMap()
-	g.calcRefDepths()
+	g.calcRefDepths(rootRule)
 
 	return g
 }
@@ -215,6 +216,17 @@ func (g *generator) printNode(n *node, indent string) {
 	}
 }
 
+func (g *generator) print(n *node, indent string) {
+	switch n.kind {
+	case kwKind, terminalSymbolKind:
+		fmt.Printf("%s%s(%d, %s) {\n", indent, n.kind, n.id, n.value)
+	case bnfKind:
+		fmt.Printf("%s%s(%d, %s) {\n", indent, n.kind, n.id, n.name)
+	default:
+		fmt.Printf("%s%s(%d) {\n", indent, n.kind, n.id)
+	}
+}
+
 func (g *generator) condenseRhs(n *node) {
 	for _, child := range n.children {
 		if child.kind == bnfDefKind {
@@ -230,11 +242,10 @@ func (g *generator) condenseRhs(n *node) {
 	}
 }
 
-func (g *generator) calcRefDepths() {
+func (g *generator) calcRefDepths(rootName string) {
 	leafRules := map[*node]string{}
-	interiorRules := map[*node]string{}
 
-	// First find all the leaf rules. Their refDepth is 0, the default value.
+	// First find all the leaf rules.
 	for k, v := range g.rules {
 		hasRef := false
 		g.walk(v, func(n *node) {
@@ -242,20 +253,73 @@ func (g *generator) calcRefDepths() {
 				hasRef = true
 			}
 		})
-		if hasRef {
-			interiorRules[v] = k
-		} else {
+		if !hasRef {
 			leafRules[v] = k
 		}
 	}
 
-	for len(interiorRules) > 0 {
-		rule, name := g.getRule(interiorRules)
-		if rule == nil {
-			break
-		}
-		g.calcRefDepthForRule(rule, name, interiorRules, leafRules, map[*node]int{})
+	root, ok := g.rules[rootName]
+	if !ok {
+		panic(fmt.Sprintf("no rule found for %s", rootName))
 	}
+	indent := ""
+	g.calculateRefDepths(rootName, root, leafRules, map[int]bool{}, &indent)
+}
+
+func (g *generator) calculateRefDepths(name string, n *node, leafRules map[*node]string, seen map[int]bool, indent *string) int {
+	//fmt.Printf("%skind=%s name=%s\n", *indent, n.kind, n.name)
+	g.print(n, *indent)
+	*indent = *indent + "  "
+	defer func(n *node) {
+		*indent = strings.TrimPrefix(*indent, "  ")
+		fmt.Printf("%s}\n", *indent)
+	}(n)
+	if _, ok := seen[n.id]; ok {
+		panic(fmt.Sprintf("node %d already seen", n.id))
+	}
+	if n.refDepth > 0 {
+		fmt.Printf("%struncated\n", *indent)
+		return n.refDepth
+	}
+	seen[n.id] = true
+	defer delete(seen, n.id)
+
+	if _, ok := leafRules[n]; ok {
+		return 0
+	}
+
+	switch n.kind {
+	case bnfKind:
+		if next, ok := g.rules[n.name]; ok {
+			if _, ok := seen[next.id]; ok {
+				fmt.Printf("%sstopped\n", *indent)
+				n.refDepth = math.MaxInt
+				return n.refDepth
+			}
+			n.refDepth = g.incRefDepth(g.calculateRefDepths(n.name, next, leafRules, seen, indent), 1)
+		} else {
+			panic(fmt.Sprintf("no rule found for %s", n.name))
+		}
+	case groupKind, repeatKind, optKind:
+		mx := 0
+		for _, child := range n.children {
+			depth := g.calculateRefDepths(name, child, leafRules, seen, indent)
+			if depth > mx {
+				mx = depth
+			}
+		}
+		n.refDepth = mx
+	case altKind:
+		mn := math.MaxInt
+		for _, child := range n.children {
+			depth := g.calculateRefDepths(name, child, leafRules, seen, indent)
+			if depth < mn {
+				mn = depth
+			}
+		}
+		n.refDepth = mn
+	}
+	return n.refDepth
 }
 
 func (g *generator) calcRefDepthForRule(rule *node, name string, interiorRules map[*node]string, leafRules map[*node]string, seen map[*node]int) {

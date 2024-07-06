@@ -19,12 +19,13 @@ type generator struct {
 	rules     map[string]*node
 	grammar   *node
 	maxRevist int
+	debug     bool
 }
 
 var errRecursionLevelExceeded = errors.New("recursion level exceeded")
 
-func newGenerator(grammar *node, maxRevisit int, rootRule string) *generator {
-	g := &generator{grammar: grammar, maxRevist: maxRevisit}
+func newGenerator(grammar *node, maxRevisit int, rootRule string, debug bool) *generator {
+	g := &generator{grammar: grammar, maxRevist: maxRevisit, debug: debug}
 
 	g.transformSeeTheRules(g.grammar)
 	g.transformRepeat(g.grammar)
@@ -264,38 +265,103 @@ func (g *generator) calcRefDepths(rootName string) {
 	}
 	indent := ""
 	g.calculateRefDepths(rootName, root, leafRules, map[int]bool{}, &indent)
+
+	// Uncomment to fixup infinity reference depths.
+	//for {
+	//	if changes := g.fixupRefDepths(); changes == 0 {
+	//		break
+	//	}
+	//}
+}
+
+func (g *generator) fixupRefDepths() int {
+	changes := 0
+
+	// Fixup BNF nodes so that they are always 1 greater than the rule they reference.
+	g.walk(g.grammar, func(n *node) {
+		oldDepth := n.refDepth
+		if n.kind == bnfKind {
+			if next, ok := g.rules[n.name]; ok {
+				n.refDepth = g.incRefDepth(next.refDepth, 1)
+			} else {
+				panic(fmt.Sprintf("no rule found for %s", n.name))
+			}
+		}
+		if n.refDepth != oldDepth {
+			changes++
+		}
+	})
+
+	// Fixup other rules to account for the previous fixup.
+	g.walk(g.grammar, func(n *node) {
+		oldDepth := n.refDepth
+		switch n.kind {
+		case altKind:
+			mn := math.MaxInt
+			for _, child := range n.children {
+				if child.refDepth < mn {
+					mn = child.refDepth
+				}
+			}
+			n.refDepth = mn
+		case groupKind, repeatKind, optKind:
+			mx := 0
+			for _, child := range n.children {
+				if child.refDepth > mx {
+					mx = child.refDepth
+				}
+			}
+			n.refDepth = mx
+		}
+		if n.refDepth != oldDepth {
+			changes++
+		}
+	})
+
+	return changes
 }
 
 func (g *generator) calculateRefDepths(name string, n *node, leafRules map[*node]string, seen map[int]bool, indent *string) int {
-	//fmt.Printf("%skind=%s name=%s\n", *indent, n.kind, n.name)
-	g.print(n, *indent)
-	*indent = *indent + "  "
-	defer func(n *node) {
-		*indent = strings.TrimPrefix(*indent, "  ")
-		fmt.Printf("%s}\n", *indent)
-	}(n)
-	if _, ok := seen[n.id]; ok {
-		panic(fmt.Sprintf("node %d already seen", n.id))
+	// Print debugging information
+	if g.debug {
+		g.print(n, *indent)
+		*indent = *indent + "  "
+		defer func(n *node) {
+			*indent = strings.TrimPrefix(*indent, "  ")
+			fmt.Printf("%s}\n", *indent)
+		}(n)
 	}
-	if n.refDepth > 0 {
-		fmt.Printf("%struncated\n", *indent)
+
+	// Check to see if we've seen the node n, in the call stack. If so return infinity.
+	if _, ok := seen[n.id]; ok {
+		if g.debug {
+			fmt.Printf("%sstopped\n", *indent)
+		}
+		n.refDepth = math.MaxInt
 		return n.refDepth
 	}
+
+	// Check to see if refDepth has been calculated for the node n. If so, return it.
+	if n.refDepth > 0 {
+		if g.debug {
+			fmt.Printf("%struncated\n", *indent)
+		}
+		return n.refDepth
+	}
+
+	// Add the node n to the seen set. Remove it on exit.
 	seen[n.id] = true
 	defer delete(seen, n.id)
 
+	// Check to see if the node n is a leaf node. If so, return 0.
 	if _, ok := leafRules[n]; ok {
 		return 0
 	}
 
+	// Calculate, recursively the refDepth for the node n.
 	switch n.kind {
 	case bnfKind:
 		if next, ok := g.rules[n.name]; ok {
-			if _, ok := seen[next.id]; ok {
-				fmt.Printf("%sstopped\n", *indent)
-				n.refDepth = math.MaxInt
-				return n.refDepth
-			}
 			n.refDepth = g.incRefDepth(g.calculateRefDepths(n.name, next, leafRules, seen, indent), 1)
 		} else {
 			panic(fmt.Sprintf("no rule found for %s", n.name))
@@ -318,61 +384,13 @@ func (g *generator) calculateRefDepths(name string, n *node, leafRules map[*node
 			}
 		}
 		n.refDepth = mn
+	case kwKind, terminalSymbolKind:
+	default:
+		if g.debug {
+			fmt.Printf("'%d' not handled: kind=%s\n", n.id, n.kind)
+		}
 	}
 	return n.refDepth
-}
-
-func (g *generator) calcRefDepthForRule(rule *node, name string, interiorRules map[*node]string, leafRules map[*node]string, seen map[*node]int) {
-	if cnt, ok := seen[rule]; ok {
-		seen[rule] = cnt + 1
-	} else {
-		seen[rule] = 1
-	}
-	delete(interiorRules, rule)
-	g.calcRefDepthForNode(rule, interiorRules, leafRules, seen, 0)
-	seen[rule] = seen[rule] - 1
-	if seen[rule] == 0 {
-		delete(seen, rule)
-	}
-}
-
-func (g *generator) calcRefDepthForNode(n *node, interiorRules map[*node]string, leafRules map[*node]string, seen map[*node]int, depth int) {
-	switch n.kind {
-	case kwKind, terminalSymbolKind:
-		n.refDepth = depth
-	case groupKind, repeatKind, optKind:
-		mx := 0
-		for _, child := range n.children {
-			g.calcRefDepthForNode(child, interiorRules, leafRules, seen, depth)
-			if child.refDepth > mx {
-				mx = child.refDepth
-			}
-		}
-		n.refDepth = g.incRefDepth(n.refDepth, mx)
-	case altKind:
-		mn := 0
-		for _, child := range n.children {
-			g.calcRefDepthForNode(child, interiorRules, leafRules, seen, depth)
-			if child.refDepth < mn {
-				mn = child.refDepth
-			}
-		}
-		n.refDepth = g.incRefDepth(n.refDepth, mn)
-	case bnfKind:
-		rule, ok := g.rules[n.name]
-		if !ok {
-			panic(fmt.Sprintf("rule named %s not found", n.name))
-		}
-		if _, ok = seen[rule]; ok {
-			n.refDepth = math.MaxInt
-		} else {
-			name, ok := interiorRules[rule]
-			if ok {
-				g.calcRefDepthForRule(rule, name, interiorRules, leafRules, seen)
-			}
-			n.refDepth = g.incRefDepth(rule.refDepth, 1)
-		}
-	}
 }
 
 func (g *generator) incRefDepth(depth int, by int) int {
@@ -429,6 +447,8 @@ func (g *generator) generateBnf(n *node, shortestPath bool) (string, error) {
 func (g *generator) generateAlt(n *node, shortestPath bool) (string, error) {
 	if shortestPath {
 		i := g.getShortestPath(n)
+		child := n.children[i]
+		fmt.Printf("Shortest path: altId=%d, id=%d, refDepth=%d\n", n.id, child.id, child.refDepth)
 		return g.generateNode(n.children[i], shortestPath)
 	} else {
 		i := g.randomRange(0, len(n.children))

@@ -1,41 +1,46 @@
+GOROOT=/usr/local/go #gosetup
+GOPATH=/Users/mburbidg/go #gosetup
+/usr/local/go/bin/go test -c -o /Users/mburbidg/Library/Caches/JetBrains/GoLand2024.1/tmp/GoLand/___2TestNewGenerator_in_github_com_mburbidg_gqlgen.test github.com/mburbidg/gqlgen #gosetup
+/usr/local/go/bin/go tool test2json -t /Users/mburbidg/Library/Caches/JetBrains/GoLand2024.1/tmp/GoLand/___2TestNewGenerator_in_github_com_mburbidg_gqlgen.test -test.v -test.paniconexit0 -test.run ^\QTestNewGenerator\E$
+=== RUN   TestNewGenerator
 grammar(0) refDepth=0
   BNFdef(1, label expression) refDepth=0
-    alt(2) refDepth=0
-      BNF(3, label term) refDepth=1
-      BNF(4, label disjunction) refDepth=9223372036854775807
+    alt(2) refDepth=4
+      BNF(3, label term) refDepth=4
+      BNF(4, label disjunction) refDepth=6
   BNFdef(5, label disjunction) refDepth=0
-    group(6) refDepth=9223372036854775807
-      BNF(7, label expression) refDepth=9223372036854775807
+    group(6) refDepth=5
+      BNF(7, label expression) refDepth=5
       BNF(8, vertical bar) refDepth=1
-      BNF(9, label term) refDepth=1
+      BNF(9, label term) refDepth=4
   BNFdef(10, label term) refDepth=0
-    alt(11) refDepth=0
-      BNF(12, label factor) refDepth=1
-      BNF(13, label conjunction) refDepth=9223372036854775807
+    alt(11) refDepth=3
+      BNF(12, label factor) refDepth=3
+      BNF(13, label conjunction) refDepth=5
   BNFdef(14, label conjunction) refDepth=0
-    group(15) refDepth=9223372036854775807
-      BNF(16, label term) refDepth=9223372036854775807
+    group(15) refDepth=4
+      BNF(16, label term) refDepth=4
       BNF(17, ampersand) refDepth=1
-      BNF(18, label factor) refDepth=1
+      BNF(18, label factor) refDepth=3
   BNFdef(19, label factor) refDepth=0
-    alt(20) refDepth=0
-      BNF(21, label primary) refDepth=9223372036854775807
-      BNF(22, label negation) refDepth=9223372036854775807
+    alt(20) refDepth=2
+      BNF(21, label primary) refDepth=2
+      BNF(22, label negation) refDepth=3
   BNFdef(23, label negation) refDepth=0
-    group(24) refDepth=1
+    group(24) refDepth=2
       BNF(25, exclamation mark) refDepth=1
-      BNF(26, label primary) refDepth=1
+      BNF(26, label primary) refDepth=2
   BNFdef(27, label primary) refDepth=0
-    alt(28) refDepth=0
+    alt(28) refDepth=1
       BNF(29, label name) refDepth=1
       BNF(30, wildcard label) refDepth=2
-      BNF(31, parenthesized label expression) refDepth=2
+      BNF(31, parenthesized label expression) refDepth=6
   BNFdef(32, wildcard label) refDepth=0
     BNF(33, percent) refDepth=1
   BNFdef(34, parenthesized label expression) refDepth=0
-    group(35) refDepth=1
+    group(35) refDepth=5
       BNF(36, left paren) refDepth=1
-      BNF(37, label expression) refDepth=1
+      BNF(37, label expression) refDepth=5
       BNF(38, right paren) refDepth=1
   BNFdef(39, label name) refDepth=0
     alt(40) refDepth=0
@@ -54,3 +59,9 @@ grammar(0) refDepth=0
     terminalsymbol(53) refDepth=0
   BNFdef(54, right paren) refDepth=0
     terminalsymbol(55) refDepth=0
+  BNFdef(56, foo) refDepth=0
+    terminalsymbol(57) refDepth=0
+--- PASS: TestNewGenerator (0.00s)
+PASS
+
+Process finished with the exit code 0

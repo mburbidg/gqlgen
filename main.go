@@ -14,8 +14,7 @@ func main() {
 	p := newBNFParser()
 	tree := p.parse(bnfIn)
 
-	g := newGenerator(tree, 6, "value expression")
-	return
+	g := newGenerator(tree, 6, "GQL-program", false)
 	for i := 0; i < cnt; i++ {
 		s := g.generate(startRule, tree, verbose)
 		fmt.Printf("%s\n", s)

@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewGenerator(t *testing.T) {
-	f, err := os.Open("test.xml")
+	f, err := os.Open("bnf.xml")
 	if err != nil {
 		log.Fatalf("error opening xml: %s\n", err)
 	}
@@ -21,7 +21,23 @@ func TestNewGenerator(t *testing.T) {
 	grammar := p.parse(r)
 	assert.NotNil(t, grammar)
 
-	g := newGenerator(grammar, 6, "label expression")
+	g := newGenerator(grammar, 6, "GQL-program", false)
+	g.walk(g.grammar, func(n *node) {
+		if n.kind == altKind {
+			if len(n.children) > 1 {
+				eq := true
+				depth := n.children[0].refDepth
+				for i := 1; i < len(n.children); i++ {
+					if depth != n.children[i].refDepth {
+						eq = false
+					}
+				}
+				if eq {
+					fmt.Printf("all children have the same refDepth: id=%d\n", n.id)
+				}
+			}
+		}
+	})
 	g.printNode(g.grammar, "")
 }
 
@@ -37,7 +53,7 @@ func TestGenerate(t *testing.T) {
 	grammar := p.parse(r)
 	assert.NotNil(t, grammar)
 
-	g := newGenerator(grammar, 6, "GQL-program")
-	s := g.generate("GQL-program", grammar, false)
+	g := newGenerator(grammar, 6, "GQL-program", false)
+	s := g.generate("value expression", grammar, false)
 	fmt.Printf("%s\n", s)
 }

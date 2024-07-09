@@ -313,7 +313,7 @@ func (g *generator) generateGroup(n *node) (string, error) {
 
 func (g *generator) generateRepeat(n *node) (string, error) {
 	result := ""
-	cnt := g.randomRange(0, 5)
+	cnt := g.randomRange(1, 5)
 	for i := 0; i < cnt; i++ {
 		for _, child := range n.children {
 			s, err := g.generateNode(child)

@@ -17,7 +17,7 @@ func main() {
 	g := newGenerator(tree, 6)
 	for i := 0; i < cnt; i++ {
 		s := g.generate(startRule, tree, verbose)
-		fmt.Printf("%s\n", s)
+		fmt.Printf("string[%d]: %s\n", i, s)
 	}
 }
 

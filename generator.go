@@ -14,9 +14,10 @@ const (
 )
 
 type generator struct {
-	rules     map[string]*node
-	grammar   *node
-	maxRevist int
+	rules                       map[string]*node
+	grammar                     *node
+	maxRevist                   int
+	includeDelimitedIdentifiers bool
 }
 
 var errRecursionLevelExceeded = errors.New("recursion level exceeded")
@@ -266,6 +267,10 @@ func (g *generator) generateNode(n *node) (string, error) {
 
 func (g *generator) generateBnf(n *node) (string, error) {
 	if n, ok := g.rules[n.name]; ok {
+		switch n.name {
+		case "identifier":
+
+		}
 		return g.generateNode(n)
 	} else {
 		panic("rule not found: " + n.name)
@@ -345,7 +350,7 @@ var escapeSequences = []string{
 }
 
 func (g *generator) generateSingleQuotedCharacterSequence(n *node) string {
-	cnt := g.randomRange(0, 50)
+	cnt := g.randomRange(0, 5)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
 		guts, err := g.randString(cnt, charset+"\"`", []string{"''"})
@@ -363,7 +368,7 @@ func (g *generator) generateSingleQuotedCharacterSequence(n *node) string {
 }
 
 func (g *generator) generateDoubleQuotedCharacterSequence(n *node) string {
-	cnt := g.randomRange(0, 50)
+	cnt := g.randomRange(0, 5)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
 		guts, err := g.randString(cnt, charset+"'`", []string{`""`})
@@ -381,7 +386,7 @@ func (g *generator) generateDoubleQuotedCharacterSequence(n *node) string {
 }
 
 func (g *generator) generateAccentQuotedCharacterSequence(n *node) string {
-	cnt := g.randomRange(0, 50)
+	cnt := g.randomRange(0, 5)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
 		guts, err := g.randString(cnt, charset+"\"'", []string{"``"})
@@ -408,6 +413,18 @@ func (g *generator) generateCharacterRepresentation(n *node) string {
 
 func (g *generator) generateStringLiteralCharacter(n *node) string {
 	return "somerandomstring"
+}
+
+func (g *generator) generateIdentifier(n *node) (string, error) {
+	if g.includeDelimitedIdentifiers {
+		return g.generateAlt(n)
+	}
+	for _, child := range n.children {
+		if child.name == "regular identifier" {
+			return g.generateNode(n)
+		}
+	}
+	panic("regular identifier not found")
 }
 
 func (g *generator) generateIdentifierStart(n *node) string {

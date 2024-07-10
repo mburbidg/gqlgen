@@ -267,10 +267,6 @@ func (g *generator) generateNode(n *node) (string, error) {
 
 func (g *generator) generateBnf(n *node) (string, error) {
 	if n, ok := g.rules[n.name]; ok {
-		switch n.name {
-		case "identifier":
-
-		}
 		return g.generateNode(n)
 	} else {
 		panic("rule not found: " + n.name)

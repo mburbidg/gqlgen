@@ -14,10 +14,9 @@ const (
 )
 
 type generator struct {
-	rules                       map[string]*node
-	grammar                     *node
-	maxRevist                   int
-	includeDelimitedIdentifiers bool
+	rules     map[string]*node
+	grammar   *node
+	maxRevist int
 }
 
 var errRecursionLevelExceeded = errors.New("recursion level exceeded")
@@ -409,18 +408,6 @@ func (g *generator) generateCharacterRepresentation(n *node) string {
 
 func (g *generator) generateStringLiteralCharacter(n *node) string {
 	return "somerandomstring"
-}
-
-func (g *generator) generateIdentifier(n *node) (string, error) {
-	if g.includeDelimitedIdentifiers {
-		return g.generateAlt(n)
-	}
-	for _, child := range n.children {
-		if child.name == "regular identifier" {
-			return g.generateNode(n)
-		}
-	}
-	panic("regular identifier not found")
 }
 
 func (g *generator) generateIdentifierStart(n *node) string {

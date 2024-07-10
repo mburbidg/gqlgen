@@ -38,6 +38,8 @@ func TestGenerate(t *testing.T) {
 	assert.NotNil(t, grammar)
 
 	g := newGenerator(grammar, 6)
-	s := g.generate("value expression", grammar, false)
-	fmt.Printf("%s\n", s)
+	for i := 0; i < 1; i++ {
+		s := g.generate("absolute directory path", grammar, false)
+		fmt.Printf("string[%d]: %s\n", i, s)
+	}
 }

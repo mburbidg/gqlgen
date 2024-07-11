@@ -39,7 +39,7 @@ func TestGenerate(t *testing.T) {
 
 	g := newGenerator(grammar, 6)
 	for i := 0; i < 1; i++ {
-		s := g.generate("absolute directory path", grammar, false)
+		s := g.generate("identifier", grammar, false)
 		fmt.Printf("string[%d]: %s\n", i, s)
 	}
 }

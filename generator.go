@@ -14,9 +14,10 @@ const (
 )
 
 type generator struct {
-	rules     map[string]*node
-	grammar   *node
-	maxRevist int
+	rules            map[string]*node
+	grammar          *node
+	maxRevist        int
+	minCharStringLen int
 }
 
 var errRecursionLevelExceeded = errors.New("recursion level exceeded")
@@ -27,8 +28,8 @@ func newGenerator(grammar *node, maxRevisit int) *generator {
 	g.transformSeeTheRules(g.grammar)
 	g.transformRepeat(g.grammar)
 	g.transformAlt(g.grammar)
-	g.condenseRhs(g.grammar)
 	g.assignId(g.grammar)
+	g.nameRhs(g.grammar)
 	g.buildRuleMap()
 
 	return g
@@ -56,6 +57,14 @@ func (g *generator) generate(startRule string, tree *node, verbose bool) string 
 	} else {
 		panic(fmt.Sprintf("unknown start rule: %s", startRule))
 	}
+}
+
+func (g *generator) nameRhs(root *node) {
+	g.walk(root, func(n *node) {
+		if n.kind == bnfDefKind {
+			n.children[0].name = n.name
+		}
+	})
 }
 
 func (g *generator) buildRuleMap() {
@@ -222,21 +231,6 @@ func (g *generator) printNode(n *node, indent string) {
 	}
 }
 
-func (g *generator) condenseRhs(n *node) {
-	for _, child := range n.children {
-		if child.kind == bnfDefKind {
-			rhs := child.children[0]
-			if len(rhs.children) == 1 {
-				child.children[0] = rhs.children[0]
-			} else {
-				rhs.kind = groupKind
-			}
-		} else {
-			panic(fmt.Sprintf("expecting %s\n", bnfDefKind))
-		}
-	}
-}
-
 func (g *generator) generateNode(n *node) (string, error) {
 	defer g.enterLeave(n)()
 	if n.cnt > g.maxRevist {
@@ -244,6 +238,8 @@ func (g *generator) generateNode(n *node) (string, error) {
 	}
 	//fmt.Printf("generate node: kind=%s, id=%d\n", n.kind, n.id)
 	switch n.kind {
+	case rhsKind:
+		return g.generateRhs(n)
 	case altKind:
 		return g.generateAlt(n)
 	case bnfKind:
@@ -262,6 +258,18 @@ func (g *generator) generateNode(n *node) (string, error) {
 		return n.generateFn(n), nil
 	}
 	return "", nil
+}
+
+func (g *generator) generateRhs(n *node) (string, error) {
+	result := ""
+	for _, child := range n.children {
+		s, err := g.generateNode(child)
+		if err != nil {
+			return "", err
+		}
+		result += s
+	}
+	return result, nil
 }
 
 func (g *generator) generateBnf(n *node) (string, error) {
@@ -345,7 +353,7 @@ var escapeSequences = []string{
 }
 
 func (g *generator) generateSingleQuotedCharacterSequence(n *node) string {
-	cnt := g.randomRange(0, 5)
+	cnt := g.randomRange(g.minCharStringLen, 5)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
 		guts, err := g.randString(cnt, charset+"\"`", []string{"''"})
@@ -363,7 +371,7 @@ func (g *generator) generateSingleQuotedCharacterSequence(n *node) string {
 }
 
 func (g *generator) generateDoubleQuotedCharacterSequence(n *node) string {
-	cnt := g.randomRange(0, 5)
+	cnt := g.randomRange(g.minCharStringLen, 5)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
 		guts, err := g.randString(cnt, charset+"'`", []string{`""`})
@@ -381,7 +389,7 @@ func (g *generator) generateDoubleQuotedCharacterSequence(n *node) string {
 }
 
 func (g *generator) generateAccentQuotedCharacterSequence(n *node) string {
-	cnt := g.randomRange(0, 5)
+	cnt := g.randomRange(g.minCharStringLen, 5)
 	if g.randomRange(0, 100) > 90 {
 		// Use escaping only 10% of the time.
 		guts, err := g.randString(cnt, charset+"\"'", []string{"``"})
@@ -486,7 +494,13 @@ func (g *generator) randString(n int, charset string, escapeSequences []string) 
 
 func (g *generator) enterLeave(n *node) func() {
 	n.cnt++
+	if n.kind == rhsKind && n.name == "delimited identifier" {
+		g.minCharStringLen = 1
+	}
 	return func() {
 		n.cnt--
+		if n.kind == rhsKind && n.name == "delimited identifier" {
+			g.minCharStringLen = 0
+		}
 	}
 }

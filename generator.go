@@ -25,11 +25,12 @@ var errRecursionLevelExceeded = errors.New("recursion level exceeded")
 func newGenerator(grammar *node, maxRevisit int) *generator {
 	g := &generator{grammar: grammar, maxRevist: maxRevisit}
 
-	g.transformSeeTheRules(g.grammar)
-	g.transformRepeat(g.grammar)
-	g.transformAlt(g.grammar)
-	g.assignId(g.grammar)
-	g.nameRhs(g.grammar)
+	transformSeeTheRules(g.grammar)
+	transformRepeat(g.grammar)
+	transformAlt(g.grammar)
+	assignId(g.grammar)
+	nameRhs(g.grammar)
+
 	g.buildRuleMap()
 
 	return g
@@ -57,14 +58,6 @@ func (g *generator) generate(startRule string, tree *node, verbose bool) string 
 	} else {
 		panic(fmt.Sprintf("unknown start rule: %s", startRule))
 	}
-}
-
-func (g *generator) nameRhs(root *node) {
-	g.walk(root, func(n *node) {
-		if n.kind == bnfDefKind {
-			n.children[0].name = n.name
-		}
-	})
 }
 
 func (g *generator) buildRuleMap() {
@@ -133,88 +126,6 @@ func (g *generator) buildRuleMap() {
 	g.rules["accent quoted character sequence"] = &node{
 		kind:       fnKind,
 		generateFn: g.generateAccentQuotedCharacterSequence,
-	}
-}
-
-func (g *generator) transformRepeat(n *node) {
-	var prev *node
-	toRemove := []*node{}
-	for _, child := range n.children {
-		if child.kind == repeatKind {
-			child.children = append(child.children, prev)
-			prev.parent = child
-			toRemove = append(toRemove, prev)
-		} else {
-			g.transformRepeat(child)
-		}
-		prev = child
-	}
-	for _, child := range toRemove {
-		g.removeChild(n, child)
-	}
-}
-
-func (g *generator) removeChild(n, childToRemove *node) {
-	c := []*node{}
-	for _, child := range n.children {
-		if child.kind != childToRemove.kind {
-			c = append(c, child)
-		}
-	}
-	n.children = c
-}
-
-func (g *generator) assignId(root *node) {
-	var nextId int
-	g.walk(root, func(n *node) {
-		n.id = nextId
-		nextId++
-	})
-}
-
-func (g *generator) resetCnts(root *node) {
-	g.walk(root, func(n *node) {
-		if n.cnt != 0 {
-			fmt.Printf("cnt for (%s, %d) not zero: %d\n", n.kind, n.id, n.cnt)
-		}
-		n.cnt = 0
-	})
-}
-
-func (g *generator) transformAlt(n *node) {
-	for _, child := range n.children {
-		g.transformAlt(child)
-	}
-	if len(n.children) > 1 && n.children[0].kind == altKind {
-		alt := &node{kind: altKind, parent: n}
-		for _, child := range n.children {
-			if child.kind == altKind {
-				if len(child.children) > 1 {
-					alt.children = append(alt.children, child)
-					child.kind = groupKind
-				} else {
-					child.children[0].parent = alt
-					alt.children = append(alt.children, child.children[0])
-				}
-			} else {
-				panic("alt mixed with other nodes")
-			}
-		}
-		n.children = []*node{alt}
-	}
-}
-
-func (g *generator) transformSeeTheRules(n *node) {
-	toRemove := []*node{}
-	for _, child := range n.children {
-		if child.kind == seeTheRulesKind {
-			toRemove = append(toRemove, child)
-		} else {
-			g.transformSeeTheRules(child)
-		}
-	}
-	for _, child := range toRemove {
-		g.removeChild(n, child)
 	}
 }
 

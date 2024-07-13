@@ -114,3 +114,16 @@ func removeChild(n, childToRemove *node) {
 	}
 	n.children = c
 }
+
+func printNode(n *node, indent string) {
+	if n.kind == kwKind {
+		fmt.Printf("%s%s(%d, %s)\n", indent, n.kind, n.id, n.value)
+	} else if n.kind == bnfKind || n.kind == bnfDefKind {
+		fmt.Printf("%s%s(%d, %s)\n", indent, n.kind, n.id, n.name)
+	} else {
+		fmt.Printf("%s%s(%d)\n", indent, n.kind, n.id)
+	}
+	for _, child := range n.children {
+		printNode(child, indent+"  ")
+	}
+}

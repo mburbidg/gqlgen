@@ -1,0 +1,116 @@
+<grammar>
+    <BNFdef name="Expr" predicative="no">
+        <rhs>
+            <BNF name="AddExpr"/>
+        </rhs>
+    </BNFdef>
+    <BNFdef name="AddExpr" predicative="no">
+        <rhs>
+            <BNF name="AddExpr"/>
+            <group>
+                <alt>
+                    <terminalsymbol>+</terminalsymbol>
+                </alt>
+                <alt>
+                    <terminalsymbol>-</terminalsymbol>
+                </alt>
+            </group>
+            <BNF name="MultExpr"/>
+        </rhs>
+    </BNFdef>
+    <BNFdef name="MultExpr" predicative="no">
+        <rhs>
+            <alt>
+                <BNF name="UnaryExpr"/>
+            </alt>
+            <alt>
+                <BNF name="MultExpr"/>
+                <group>
+                    <alt>
+                        <terminalsymbol>*</terminalsymbol>
+                    </alt>
+                    <alt>
+                        <terminalsymbol>/</terminalsymbol>
+                    </alt>
+                    <alt>
+                        <terminalsymbol>%</terminalsymbol>
+                    </alt>
+                </group>
+                <BNF name="UnaryExpr"/>
+            </alt>
+        </rhs>
+    </BNFdef>
+    <BNFdef name="UnaryExpr" predicative="no">
+        <rhs>
+            <alt>
+                <BNF name="Identifier"/>
+            </alt>
+            <alt>
+                <terminalsymbol>++</terminalsymbol>
+                <BNF name="UnaryExpr"/>
+            </alt>
+            <alt>
+                <terminalsymbol>--</terminalsymbol>
+                <BNF name="UnaryExpr"/>
+            </alt>
+            <alt>
+                <terminalsymbol>+</terminalsymbol>
+                <BNF name="UnaryExpr"/>
+            </alt>
+            <alt>
+                <terminalsymbol>-</terminalsymbol>
+                <BNF name="UnaryExpr"/>
+            </alt>
+            <alt>
+                <BNF name="DecDigits"/>
+            </alt>
+        </rhs>
+    </BNFdef>
+    <BNFdef name="DecDigits" predicative="no">
+        <BNF name="DecDigit"/>
+        <repeat/>
+    </BNFdef>
+    <BNFdef name="DecDigit" predicative="no">
+        <alt>
+            <terminalsymbol>0</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>1</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>2</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>3</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>4</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>5</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>6</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>7</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>8</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>9</terminalsymbol>
+        </alt>
+    </BNFdef>
+    <BNFdef name="Identifier" predicative="no">
+        <alt>
+            <terminalsymbol>x</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>y</terminalsymbol>
+        </alt>
+        <alt>
+            <terminalsymbol>z</terminalsymbol>
+        </alt>
+    </BNFdef>
+</grammar>

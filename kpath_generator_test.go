@@ -21,5 +21,5 @@ func TestNewKpathGenerator(t *testing.T) {
 	assert.NotNil(t, grammar)
 
 	g := newKpathGenerator(grammar)
-	printNode(g.grammar, "")
+	g.generate(5)
 }

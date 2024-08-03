@@ -37,3 +37,18 @@ func TestTrie_Count(t *testing.T) {
 	trie.Insert([]int{1, 2, 3})
 	assert.Equal(t, 3, trie.Count())
 }
+
+func TestTrie_Remove(t *testing.T) {
+	trie := NewTrie[int]()
+	trie.Insert([]int{1, 2, 3})
+	assert.True(t, trie.Search([]int{1, 2, 3}))
+	trie.Remove([]int{1, 2, 3})
+	assert.False(t, trie.Search([]int{1, 2, 3}))
+	trie.Insert([]int{1, 2, 3})
+	assert.True(t, trie.Search([]int{1, 2, 3}))
+	trie.Insert([]int{1, 2})
+	assert.True(t, trie.Search([]int{1, 2}))
+	trie.Remove([]int{1, 2})
+	assert.False(t, trie.Search([]int{1, 2}))
+	assert.True(t, trie.Search([]int{1, 2, 3}))
+}
